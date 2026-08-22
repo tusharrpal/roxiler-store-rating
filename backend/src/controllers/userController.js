@@ -12,11 +12,16 @@ const getStores = async (req, res) => {
   const allowedSortFields = {
     name: "s.name",
     address: "s.address",
-    rating: "average_rating",
+    rating: "overall_rating",
   };
 
-  const sortColumn = allowedSortFields[sortBy] || "s.name";
-  const sortOrder = order.toLowerCase() === "desc" ? "DESC" : "ASC";
+  const sortColumn =
+    allowedSortFields[sortBy] || "s.name";
+
+  const sortOrder =
+    order.toLowerCase() === "desc"
+      ? "DESC"
+      : "ASC";
 
   try {
     const result = await pool.query(
@@ -24,25 +29,76 @@ const getStores = async (req, res) => {
          s.id,
          s.name,
          s.address,
-         COALESCE(ROUND(AVG(r.rating), 2), 0) AS overall_rating,
+
          COALESCE(
-           MAX(CASE WHEN r.user_id = $3 THEN r.rating END),
+           ROUND(AVG(r.rating), 2),
+           0
+         ) AS overall_rating,
+
+         COALESCE(
+           MAX(
+             CASE
+               WHEN r.user_id = $3
+               THEN r.rating
+             END
+           ),
            0
          ) AS user_rating
+
        FROM stores s
-       LEFT JOIN ratings r ON s.id = r.store_id
+
+       LEFT JOIN ratings r
+         ON s.id = r.store_id
+
        WHERE s.name ILIKE $1
          AND COALESCE(s.address, '') ILIKE $2
+
        GROUP BY s.id
+
        ORDER BY ${sortColumn} ${sortOrder}`,
-      [`%${name}%`, `%${address}%`, req.user.id]
+      [
+        `%${name}%`,
+        `%${address}%`,
+        req.user.id,
+      ]
+    );
+
+    /*
+     * Get recent ratings for every store.
+     */
+    const stores = await Promise.all(
+      result.rows.map(async (store) => {
+        const ratingsResult = await pool.query(
+          `SELECT
+             u.id,
+             u.name,
+             u.email,
+             r.rating,
+             r.created_at
+           FROM ratings r
+           JOIN users u
+             ON u.id = r.user_id
+           WHERE r.store_id = $1
+           ORDER BY r.created_at DESC`,
+          [store.id]
+        );
+
+        return {
+          ...store,
+          recent_ratings: ratingsResult.rows,
+        };
+      })
     );
 
     res.json({
-      stores: result.rows,
+      stores,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Failed to load stores:",
+      error
+    );
+
     res.status(500).json({
       message: "Failed to load stores",
     });
@@ -53,9 +109,14 @@ const submitRating = async (req, res) => {
   const { storeId } = req.params;
   const { rating } = req.body;
 
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+  if (
+    !Number.isInteger(rating) ||
+    rating < 1 ||
+    rating > 5
+  ) {
     return res.status(400).json({
-      message: "Rating must be an integer between 1 and 5",
+      message:
+        "Rating must be an integer between 1 and 5",
     });
   }
 
@@ -72,22 +133,43 @@ const submitRating = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO ratings (user_id, store_id, rating)
-       VALUES ($1, $2, $3)
+      `INSERT INTO ratings
+        (user_id, store_id, rating)
+
+       VALUES
+        ($1, $2, $3)
+
        ON CONFLICT (user_id, store_id)
+
        DO UPDATE SET
          rating = EXCLUDED.rating,
          updated_at = CURRENT_TIMESTAMP
-       RETURNING id, user_id, store_id, rating, updated_at`,
-      [req.user.id, storeId, rating]
+
+       RETURNING
+         id,
+         user_id,
+         store_id,
+         rating,
+         updated_at`,
+      [
+        req.user.id,
+        storeId,
+        rating,
+      ]
     );
 
     res.status(200).json({
-      message: "Rating submitted successfully",
+      message:
+        "Rating submitted successfully",
+
       rating: result.rows[0],
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Failed to submit rating:",
+      error
+    );
+
     res.status(500).json({
       message: "Failed to submit rating",
     });
@@ -95,11 +177,18 @@ const submitRating = async (req, res) => {
 };
 
 const updatePassword = async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
+  const {
+    currentPassword,
+    newPassword,
+  } = req.body;
 
-  if (!currentPassword || !newPassword) {
+  if (
+    !currentPassword ||
+    !newPassword
+  ) {
     return res.status(400).json({
-      message: "Current password and new password are required",
+      message:
+        "Current password and new password are required",
     });
   }
 
@@ -127,33 +216,50 @@ const updatePassword = async (req, res) => {
       });
     }
 
-    const passwordMatch = await bcrypt.compare(
-      currentPassword,
-      result.rows[0].password
-    );
+    const passwordMatch =
+      await bcrypt.compare(
+        currentPassword,
+        result.rows[0].password
+      );
 
     if (!passwordMatch) {
       return res.status(400).json({
-        message: "Current password is incorrect",
+        message:
+          "Current password is incorrect",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword =
+      await bcrypt.hash(
+        newPassword,
+        10
+      );
 
     await pool.query(
       `UPDATE users
-       SET password = $1, updated_at = CURRENT_TIMESTAMP
+       SET
+         password = $1,
+         updated_at = CURRENT_TIMESTAMP
        WHERE id = $2`,
-      [hashedPassword, req.user.id]
+      [
+        hashedPassword,
+        req.user.id,
+      ]
     );
 
     res.json({
-      message: "Password updated successfully",
+      message:
+        "Password updated successfully",
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Failed to update password:",
+      error
+    );
+
     res.status(500).json({
-      message: "Failed to update password",
+      message:
+        "Failed to update password",
     });
   }
 };

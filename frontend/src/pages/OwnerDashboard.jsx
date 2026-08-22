@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const API_URL = "http://localhost:5001/api";
@@ -8,13 +8,22 @@ function OwnerDashboard() {
   const [sortBy, setSortBy] = useState("name");
   const [order, setOrder] = useState("asc");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const user = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchDashboard = async () => {
+      if (!token) {
+        setError("Authentication required. Please login again.");
+        setLoading(false);
+        return;
+      }
+
       try {
+        setError("");
+
         const response = await axios.get(
           `${API_URL}/owner/dashboard`,
           {
@@ -24,12 +33,22 @@ function OwnerDashboard() {
           }
         );
 
-        setStores(response.data.stores);
+        const dashboardStores = Array.isArray(
+          response.data?.stores
+        )
+          ? response.data.stores
+          : [];
+
+        setStores(dashboardStores);
       } catch (err) {
+        console.error("Owner dashboard error:", err);
+
         setError(
           err.response?.data?.message ||
             "Unable to load dashboard."
         );
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -39,31 +58,121 @@ function OwnerDashboard() {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+
     window.location.href = "/login";
   };
 
-  const sortedStores = [...stores].sort((first, second) => {
-    let firstValue;
-    let secondValue;
+  /*
+   * Convert all users from all stores into one list.
+   *
+   * Expected backend format:
+   *
+   * stores: [
+   *   {
+   *     id,
+   *     name,
+   *     averageRating,
+   *     totalRatings,
+   *     users: [
+   *       {
+   *         id,
+   *         name,
+   *         email,
+   *         rating,
+   *         created_at
+   *       }
+   *     ]
+   *   }
+   * ]
+   */
+  const customerRatings = useMemo(() => {
+    const ratings = [];
 
-    if (sortBy === "rating") {
-      firstValue = first.averageRating;
-      secondValue = second.averageRating;
-    } else {
-      firstValue = first[sortBy] || "";
-      secondValue = second[sortBy] || "";
-    }
+    stores.forEach((store) => {
+      if (!Array.isArray(store.users)) {
+        return;
+      }
 
-    if (typeof firstValue === "number") {
+      store.users.forEach((rating) => {
+        ratings.push({
+          ...rating,
+          storeName: store.name,
+        });
+      });
+    });
+
+    return ratings;
+  }, [stores]);
+
+  const sortedCustomerRatings = useMemo(() => {
+    const ratings = [...customerRatings];
+
+    ratings.sort((first, second) => {
+      let firstValue;
+      let secondValue;
+
+      if (sortBy === "rating") {
+        firstValue = Number(first.rating) || 0;
+        secondValue = Number(second.rating) || 0;
+
+        return order === "asc"
+          ? firstValue - secondValue
+          : secondValue - firstValue;
+      }
+
+      if (sortBy === "date") {
+        firstValue = first.created_at
+          ? new Date(first.created_at).getTime()
+          : 0;
+
+        secondValue = second.created_at
+          ? new Date(second.created_at).getTime()
+          : 0;
+
+        return order === "asc"
+          ? firstValue - secondValue
+          : secondValue - firstValue;
+      }
+
+      firstValue = String(
+        first[sortBy] || ""
+      ).toLowerCase();
+
+      secondValue = String(
+        second[sortBy] || ""
+      ).toLowerCase();
+
       return order === "asc"
-        ? firstValue - secondValue
-        : secondValue - firstValue;
+        ? firstValue.localeCompare(secondValue)
+        : secondValue.localeCompare(firstValue);
+    });
+
+    return ratings;
+  }, [customerRatings, sortBy, order]);
+
+  const formatRating = (rating) => {
+    const value = Number(rating);
+
+    if (Number.isNaN(value)) {
+      return "0.00";
     }
 
-    return order === "asc"
-      ? String(firstValue).localeCompare(String(secondValue))
-      : String(secondValue).localeCompare(String(firstValue));
-  });
+    return value.toFixed(2);
+  };
+
+  const formatDate = (date) => {
+    if (!date) {
+      return "-";
+    }
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "-";
+    }
+
+    return parsedDate.toLocaleDateString();
+  };
 
   return (
     <div className="container-fluid px-4 py-3">
@@ -79,25 +188,24 @@ function OwnerDashboard() {
             {user?.name}
           </span>
 
-          <div className="d-flex align-items-center gap-3">
-            <span className="text-muted">
-              {user?.name}
-            </span>
+          <button
+            type="button"
+            className="btn btn-outline-primary btn-sm"
+            onClick={() =>
+              (window.location.href =
+                "/change-password")
+            }
+          >
+            Change Password
+          </button>
 
-            <button
-              className="btn btn-outline-primary btn-sm"
-              onClick={() => (window.location.href = "/change-password")}
-            >
-              Change Password
-            </button>
-
-            <button
-              className="btn btn-outline-danger btn-sm"
-              onClick={logout}
-            >
-              Logout
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-outline-danger btn-sm"
+            onClick={logout}
+          >
+            Logout
+          </button>
         </div>
       </nav>
 
@@ -107,9 +215,12 @@ function OwnerDashboard() {
         <h2>Store Owner Dashboard</h2>
 
         <p className="text-muted">
-          View your store performance and customer ratings.
+          View your store performance and customer
+          ratings.
         </p>
       </div>
+
+      {/* Error */}
 
       {error && (
         <div className="alert alert-danger">
@@ -117,169 +228,239 @@ function OwnerDashboard() {
         </div>
       )}
 
+      {/* Loading */}
+
+      {loading && (
+        <div className="text-center py-5">
+          <div
+            className="spinner-border text-primary"
+            role="status"
+          >
+            <span className="visually-hidden">
+              Loading...
+            </span>
+          </div>
+
+          <p className="text-muted mt-2">
+            Loading dashboard...
+          </p>
+        </div>
+      )}
+
       {/* Store Cards */}
 
-      <div className="row g-3 mb-4">
-        {stores.map((store) => (
-          <div
-            className="col-md-4"
-            key={store.id}
-          >
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <h5 className="card-title">
-                  {store.name}
-                </h5>
+      {!loading && stores.length > 0 && (
+        <div className="row g-3 mb-4">
+          {stores.map((store) => (
+            <div
+              className="col-md-6 col-lg-4"
+              key={store.id}
+            >
+              <div className="card border-0 shadow-sm h-100">
+                <div className="card-body">
+                  <h5 className="card-title">
+                    {store.name}
+                  </h5>
 
-                <p className="text-muted mb-1">
-                  {store.email}
-                </p>
+                  <p className="text-muted mb-1">
+                    {store.email}
+                  </p>
 
-                <p className="text-muted">
-                  {store.address || "-"}
-                </p>
+                  <p className="text-muted mb-0">
+                    {store.address || "-"}
+                  </p>
 
-                <div className="d-flex gap-3 mt-3">
-                  <div>
-                    <small className="text-muted">
-                      Average Rating
-                    </small>
+                  <hr />
 
-                    <h3 className="mb-0">
-                      ★ {store.averageRating}
-                    </h3>
-                  </div>
+                  <div className="row text-center">
+                    <div className="col-6">
+                      <small className="text-muted d-block">
+                        Average Rating
+                      </small>
 
-                  <div>
-                    <small className="text-muted">
-                      Total Ratings
-                    </small>
+                      <h3 className="mb-0 mt-1">
+                        ★{" "}
+                        {formatRating(
+                          store.averageRating
+                        )}
+                      </h3>
+                    </div>
 
-                    <h3 className="mb-0">
-                      {store.totalRatings}
-                    </h3>
+                    <div className="col-6">
+                      <small className="text-muted d-block">
+                        Total Ratings
+                      </small>
+
+                      <h3 className="mb-0 mt-1">
+                        {store.totalRatings || 0}
+                      </h3>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Ratings */}
-
-      <div className="card border-0 shadow-sm">
-        <div className="card-body">
-
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h5 className="mb-1">
-                Customer Ratings
-              </h5>
-
-              <p className="text-muted mb-0">
-                Users who submitted ratings for your store.
-              </p>
-            </div>
-
-            <div className="d-flex gap-2">
-              <select
-                className="form-select"
-                value={sortBy}
-                onChange={(event) =>
-                  setSortBy(event.target.value)
-                }
-              >
-                <option value="name">
-                  Sort by Name
-                </option>
-
-                <option value="email">
-                  Sort by Email
-                </option>
-
-                <option value="rating">
-                  Sort by Rating
-                </option>
-              </select>
-
-              <select
-                className="form-select"
-                value={order}
-                onChange={(event) =>
-                  setOrder(event.target.value)
-                }
-              >
-                <option value="asc">
-                  Ascending
-                </option>
-
-                <option value="desc">
-                  Descending
-                </option>
-              </select>
-            </div>
-          </div>
-
-          {sortedStores.map((store) => (
-            <div
-              key={store.id}
-              className="table-responsive"
-            >
-              <table className="table table-hover align-middle">
-                <thead className="table-light">
-                  <tr>
-                    <th>User Name</th>
-                    <th>Email</th>
-                    <th>Rating</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {store.users.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan="4"
-                        className="text-center py-5 text-muted"
-                      >
-                        No ratings yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    store.users.map((rating) => (
-                      <tr key={rating.id}>
-                        <td className="fw-semibold">
-                          {rating.name}
-                        </td>
-
-                        <td>
-                          {rating.email}
-                        </td>
-
-                        <td>
-                          <span className="badge text-bg-warning">
-                            ★ {rating.rating}
-                          </span>
-                        </td>
-
-                        <td>
-                          {rating.created_at
-                            ? new Date(
-                                rating.created_at
-                              ).toLocaleDateString()
-                            : "-"}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
           ))}
-
         </div>
-      </div>
+      )}
+
+      {/* No Store */}
+
+      {!loading && stores.length === 0 && !error && (
+        <div className="alert alert-info">
+          No store is currently assigned to your
+          account.
+        </div>
+      )}
+
+      {/* Customer Ratings */}
+
+      {!loading && stores.length > 0 && (
+        <div className="card border-0 shadow-sm">
+          <div className="card-body">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+              <div>
+                <h5 className="mb-1">
+                  Customer Ratings
+                </h5>
+
+                <p className="text-muted mb-0">
+                  Users who submitted ratings for your
+                  store.
+                </p>
+              </div>
+
+              {/* Sorting */}
+
+              <div className="d-flex gap-2">
+                <select
+                  className="form-select"
+                  value={sortBy}
+                  onChange={(event) =>
+                    setSortBy(event.target.value)
+                  }
+                >
+                  <option value="name">
+                    Sort by Name
+                  </option>
+
+                  <option value="email">
+                    Sort by Email
+                  </option>
+
+                  <option value="rating">
+                    Sort by Rating
+                  </option>
+
+                  <option value="date">
+                    Sort by Date
+                  </option>
+                </select>
+
+                <select
+                  className="form-select"
+                  value={order}
+                  onChange={(event) =>
+                    setOrder(event.target.value)
+                  }
+                >
+                  <option value="asc">
+                    Ascending
+                  </option>
+
+                  <option value="desc">
+                    Descending
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            {/* Rating Count */}
+
+            <div className="mb-3">
+              <span className="badge text-bg-primary">
+                {customerRatings.length}{" "}
+                {customerRatings.length === 1
+                  ? "Rating"
+                  : "Ratings"}
+              </span>
+            </div>
+
+            {/* Ratings Table */}
+
+            {sortedCustomerRatings.length === 0 ? (
+              <div className="text-center py-5">
+                <div
+                  className="fs-1 mb-2"
+                  aria-hidden="true"
+                >
+                  ★
+                </div>
+
+                <h5>No ratings yet</h5>
+
+                <p className="text-muted mb-0">
+                  Users who rate your store will
+                  appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>User Name</th>
+                      <th>Email</th>
+                      <th>Store</th>
+                      <th>Rating</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {sortedCustomerRatings.map(
+                      (rating, index) => (
+                        <tr
+                          key={
+                            rating.id ||
+                            `${rating.email}-${rating.storeName}-${index}`
+                          }
+                        >
+                          <td className="fw-semibold">
+                            {rating.name || "-"}
+                          </td>
+
+                          <td>
+                            {rating.email || "-"}
+                          </td>
+
+                          <td>
+                            {rating.storeName || "-"}
+                          </td>
+
+                          <td>
+                            <span className="badge text-bg-warning">
+                              ★{" "}
+                              {formatRating(
+                                rating.rating
+                              )}
+                            </span>
+                          </td>
+
+                          <td>
+                            {formatDate(
+                              rating.created_at
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
