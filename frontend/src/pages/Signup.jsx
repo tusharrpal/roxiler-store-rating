@@ -14,6 +14,7 @@ function Signup() {
     password: "",
   });
 
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,10 @@ function Signup() {
     setLoading(true);
 
     try {
-      await axios.post(`${API_URL}/auth/register`, form);
+      await axios.post(
+        `${API_URL}/auth/register`,
+        form
+      );
 
       setMessage("Account created successfully.");
 
@@ -128,15 +132,29 @@ function Signup() {
               Password
             </label>
 
-            <input
-              type="password"
-              name="password"
-              className="form-control"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-              required
-            />
+            <div className="input-group">
+              <input
+                type={
+                  showPassword ? "text" : "password"
+                }
+                name="password"
+                className="form-control"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                required
+              />
+
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() =>
+                  setShowPassword(!showPassword)
+                }
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
           <button
@@ -144,12 +162,15 @@ function Signup() {
             className="btn btn-primary w-100"
             disabled={loading}
           >
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading
+              ? "Creating account..."
+              : "Sign Up"}
           </button>
         </form>
 
         <p className="text-center mt-3 mb-0">
           Already have an account?{" "}
+
           <button
             type="button"
             className="btn btn-link p-0"

@@ -12,6 +12,7 @@ function Login() {
     password: "",
   });
 
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +30,10 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, form);
+      const response = await axios.post(
+        `${API_URL}/auth/login`,
+        form
+      );
 
       const { token, user } = response.data;
 
@@ -57,13 +61,23 @@ function Login() {
     <div className="login-page">
       <div className="login-card">
         <h2>Store Rating</h2>
-        <p className="text-muted">Sign in to continue</p>
 
-        {error && <div className="alert alert-danger">{error}</div>}
+        <p className="text-muted">
+          Sign in to continue
+        </p>
+
+        {error && (
+          <div className="alert alert-danger">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="form-label">Email</label>
+            <label className="form-label">
+              Email
+            </label>
+
             <input
               type="email"
               name="email"
@@ -76,16 +90,33 @@ function Login() {
           </div>
 
           <div className="mb-3">
-            <label className="form-label">Password</label>
-            <input
-              type="password"
-              name="password"
-              className="form-control"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-              required
-            />
+            <label className="form-label">
+              Password
+            </label>
+
+            <div className="input-group">
+              <input
+                type={
+                  showPassword ? "text" : "password"
+                }
+                name="password"
+                className="form-control"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                required
+              />
+
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() =>
+                  setShowPassword(!showPassword)
+                }
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
           <button
@@ -99,6 +130,7 @@ function Login() {
 
         <p className="text-center mt-3 mb-0">
           Don't have an account?{" "}
+
           <button
             type="button"
             className="btn btn-link p-0"

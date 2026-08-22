@@ -7,13 +7,22 @@ const API_URL = "http://localhost:5001/api";
 function ChangePassword() {
   const navigate = useNavigate();
 
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(
+    localStorage.getItem("user")
+  );
+
   const token = localStorage.getItem("token");
 
   const [form, setForm] = useState({
     currentPassword: "",
     newPassword: "",
   });
+
+  const [showCurrentPassword, setShowCurrentPassword] =
+    useState(false);
+
+  const [showNewPassword, setShowNewPassword] =
+    useState(false);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -34,10 +43,13 @@ function ChangePassword() {
     setLoading(true);
 
     try {
-      const endpoint =
-        user?.role === "STORE_OWNER"
-          ? `${API_URL}/owner/password`
-          : `${API_URL}/user/password`;
+      let endpoint = `${API_URL}/user/password`;
+
+      if (user?.role === "STORE_OWNER") {
+        endpoint = `${API_URL}/owner/password`;
+      } else if (user?.role === "ADMIN") {
+        endpoint = `${API_URL}/admin/password`;
+      }
 
       const response = await axios.put(
         endpoint,
@@ -90,34 +102,80 @@ function ChangePassword() {
         )}
 
         <form onSubmit={handleSubmit}>
+          {/* Current Password */}
+
           <div className="mb-3">
             <label className="form-label">
               Current Password
             </label>
 
-            <input
-              type="password"
-              name="currentPassword"
-              className="form-control"
-              value={form.currentPassword}
-              onChange={handleChange}
-              required
-            />
+            <div className="input-group">
+              <input
+                type={
+                  showCurrentPassword
+                    ? "text"
+                    : "password"
+                }
+                name="currentPassword"
+                className="form-control"
+                value={form.currentPassword}
+                onChange={handleChange}
+                placeholder="Enter current password"
+                required
+              />
+
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() =>
+                  setShowCurrentPassword(
+                    !showCurrentPassword
+                  )
+                }
+              >
+                {showCurrentPassword
+                  ? "Hide"
+                  : "Show"}
+              </button>
+            </div>
           </div>
+
+          {/* New Password */}
 
           <div className="mb-3">
             <label className="form-label">
               New Password
             </label>
 
-            <input
-              type="password"
-              name="newPassword"
-              className="form-control"
-              value={form.newPassword}
-              onChange={handleChange}
-              required
-            />
+            <div className="input-group">
+              <input
+                type={
+                  showNewPassword
+                    ? "text"
+                    : "password"
+                }
+                name="newPassword"
+                className="form-control"
+                value={form.newPassword}
+                onChange={handleChange}
+                placeholder="Enter new password"
+                required
+              />
+
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() =>
+                  setShowNewPassword(
+                    !showNewPassword
+                  )
+                }
+              >
+                {showNewPassword
+                  ? "Hide"
+                  : "Show"}
+              </button>
+            </div>
           </div>
 
           <button
