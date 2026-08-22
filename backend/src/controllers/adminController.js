@@ -47,6 +47,7 @@ const createUser = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Failed to create user",
     });
@@ -93,6 +94,7 @@ const createStore = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Failed to create store",
     });
@@ -114,6 +116,7 @@ const getDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Failed to load dashboard",
     });
@@ -137,8 +140,13 @@ const getUsers = async (req, res) => {
     role: "u.role",
   };
 
-  const sortColumn = allowedSortFields[sortBy] || "u.name";
-  const sortOrder = order.toLowerCase() === "desc" ? "DESC" : "ASC";
+  const sortColumn =
+    allowedSortFields[sortBy] || "u.name";
+
+  const sortOrder =
+    order.toLowerCase() === "desc"
+      ? "DESC"
+      : "ASC";
 
   try {
     const result = await pool.query(
@@ -154,7 +162,12 @@ const getUsers = async (req, res) => {
          AND COALESCE(u.address, '') ILIKE $3
          AND ($4 = '' OR u.role = $4)
        ORDER BY ${sortColumn} ${sortOrder}`,
-      [`%${name}%`, `%${email}%`, `%${address}%`, role]
+      [
+        `%${name}%`,
+        `%${email}%`,
+        `%${address}%`,
+        role,
+      ]
     );
 
     res.json({
@@ -162,6 +175,7 @@ const getUsers = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Failed to load users",
     });
@@ -181,11 +195,18 @@ const getStores = async (req, res) => {
     name: "s.name",
     email: "s.email",
     address: "s.address",
-    rating: "average_rating",
+
+    // FIX: the SELECT query creates the alias "rating"
+    rating: "rating",
   };
 
-  const sortColumn = allowedSortFields[sortBy] || "s.name";
-  const sortOrder = order.toLowerCase() === "desc" ? "DESC" : "ASC";
+  const sortColumn =
+    allowedSortFields[sortBy] || "s.name";
+
+  const sortOrder =
+    order.toLowerCase() === "desc"
+      ? "DESC"
+      : "ASC";
 
   try {
     const result = await pool.query(
@@ -202,7 +223,11 @@ const getStores = async (req, res) => {
          AND COALESCE(s.address, '') ILIKE $3
        GROUP BY s.id
        ORDER BY ${sortColumn} ${sortOrder}`,
-      [`%${name}%`, `%${email}%`, `%${address}%`]
+      [
+        `%${name}%`,
+        `%${email}%`,
+        `%${address}%`,
+      ]
     );
 
     res.json({
@@ -210,6 +235,7 @@ const getStores = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Failed to load stores",
     });
@@ -251,6 +277,7 @@ const getUserById = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+
     res.status(500).json({
       message: "Failed to load user",
     });
@@ -263,7 +290,8 @@ const updatePassword = async (req, res) => {
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
-        message: "Current password and new password are required",
+        message:
+          "Current password and new password are required",
       });
     }
 
