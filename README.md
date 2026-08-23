@@ -243,3 +243,24 @@ Defined in `frontend/src/App.jsx`:
 Submitted as part of the Roxiler FullStack Intern coding challenge.
 
 
+
+
+
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+<img width="1000" height="956" alt="Screenshot 2026-08-23 at 4 17 17 PM" src="https://github.com/user-attachments/assets/d0c0ee19-6908-45e1-840b-13f81480be65" />
+<img width="1000" height="956" alt="Screenshot 2026-08-23 at 4 17 50 PM" src="https://github.com/user-attachments/assets/981c464a-58d0-490d-9f28-b01521dc5ee1" />
+<img width="1000" height="956" alt="Screenshot 2026-08-23 at 4 17 59 PM" src="https://github.com/user-attachments/assets/e34f9a16-b5e7-43ef-9741-92e1bb1eed5e" />
+<img width="1000" height="956" alt="Screenshot 2026-08-23 at 4 18 36 PM" src="https://github.com/user-attachments/assets/852cd753-cde7-4feb-8113-c147fc6ed3a1" />
+<img width="1000" height="956" alt="Screenshot 2026-08-23 at 4 20 07 PM" src="https://github.com/user-attachments/assets/0ed7c40b-fea9-49eb-bf9e-90b89fc30513" />
+
+
+
+
+
